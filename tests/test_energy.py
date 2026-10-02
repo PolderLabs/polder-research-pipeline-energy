@@ -1,25 +1,40 @@
 """Hand calculations and failure regressions for the concept-only energy tool."""
 
-from dataclasses import asdict, replace
-from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import random
 import xml.etree.ElementTree as ET
+from dataclasses import asdict, replace
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from polder_research.energy import (
-    NOTICE, Sample, Scenario, build_project, canonical, dc_current_a,
-    demo_profile, demo_scenario, init_project, main, read_json, read_profile,
-    simulate, topology_svg, validate_project,
+    NOTICE,
+    Sample,
+    Scenario,
+    build_project,
+    canonical,
+    dc_current_a,
+    demo_profile,
+    demo_scenario,
+    init_project,
+    main,
+    read_json,
+    read_profile,
+    simulate,
+    topology_svg,
+    validate_project,
 )
 
-START = datetime(2025, 1, 1, tzinfo=timezone.utc)
+START = datetime(2025, 1, 1, tzinfo=UTC)
 
 
 def rows(*pairs):
-    return [Sample(START + timedelta(minutes=15 * i), tuple(load), tuple(pv)) for i, (load, pv) in enumerate(pairs)]
+    return [
+        Sample(START + timedelta(minutes=15 * i), tuple(load), tuple(pv))
+        for i, (load, pv) in enumerate(pairs)
+    ]
 
 
 def test_hand_calculated_lossless_charge_discharge():
@@ -44,8 +59,14 @@ def test_losses_soc_and_power_limits():
 
 
 def test_phase_summing_is_not_physical_fuse_relief():
-    s = replace(demo_scenario(3), topology="single_phase", battery_phase=2,
-                initial_soc=0.8, discharge_limit_kw_ac=6, auxiliary_kw_ac=0)
+    s = replace(
+        demo_scenario(3),
+        topology="single_phase",
+        battery_phase=2,
+        initial_soc=0.8,
+        discharge_limit_kw_ac=6,
+        auxiliary_kw_ac=0,
+    )
     result = simulate(s, rows(([5, 0, 0], [0, 0, 0])))
     assert result["trace"][0]["grid_kw_by_phase"] == pytest.approx([5, -5, 0])
     assert result["totals"]["grid_import_kwh"] == pytest.approx(0)
@@ -80,13 +101,21 @@ def test_reject_invalid_numeric_inputs(value):
         replace(demo_scenario(1), nominal_kwh=value)
 
 
-@pytest.mark.parametrize("kwargs", [
-    {"grid_phases": 2}, {"grid_phases": True}, {"charge_efficiency": 0},
-    {"discharge_efficiency": 1.01}, {"initial_soc": 0.99},
-    {"battery_phase": 2}, {"topology": "automatic"},
-    {"topology": "three_phase_balanced"}, {"interval_minutes": True},
-    {"minimum_soc": 0.9, "maximum_soc": 0.9, "initial_soc": 0.9},
-])
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"grid_phases": 2},
+        {"grid_phases": True},
+        {"charge_efficiency": 0},
+        {"discharge_efficiency": 1.01},
+        {"initial_soc": 0.99},
+        {"battery_phase": 2},
+        {"topology": "automatic"},
+        {"topology": "three_phase_balanced"},
+        {"interval_minutes": True},
+        {"minimum_soc": 0.9, "maximum_soc": 0.9, "initial_soc": 0.9},
+    ],
+)
 def test_reject_invalid_scenario(kwargs):
     with pytest.raises(ValueError):
         replace(demo_scenario(1), **kwargs)
@@ -98,20 +127,26 @@ def test_unknown_scenario_field_rejected():
         Scenario.from_dict(data)
 
 
-@pytest.mark.parametrize("timestamp", [
-    "2025-01-01T00:00:00+00:00", "2025-01-01T00:30:00+00:00", "2024-12-31T23:45:00+00:00"
-])
+@pytest.mark.parametrize(
+    "timestamp",
+    ["2025-01-01T00:00:00+00:00", "2025-01-01T00:30:00+00:00", "2024-12-31T23:45:00+00:00"],
+)
 def test_duplicate_gap_and_order_rejected(timestamp):
     text = "timestamp,load_l1_kw,pv_l1_kw\n2025-01-01T00:00:00+00:00,1,0\n" + timestamp + ",1,0\n"
     with pytest.raises(ValueError):
         read_profile(text, demo_scenario(1))
 
 
-@pytest.mark.parametrize("bad_row", [
-    "2025-01-01T00:00:00,1,0", "2025-01-01T00:00:00Z,nan,0",
-    "2025-01-01T00:00:00Z,-1,0", "2025-01-01T00:00:00Z,1",
-    "2025-01-01T00:00:00Z,1,0,unexpected",
-])
+@pytest.mark.parametrize(
+    "bad_row",
+    [
+        "2025-01-01T00:00:00,1,0",
+        "2025-01-01T00:00:00Z,nan,0",
+        "2025-01-01T00:00:00Z,-1,0",
+        "2025-01-01T00:00:00Z,1",
+        "2025-01-01T00:00:00Z,1,0,unexpected",
+    ],
+)
 def test_bad_csv_rows_rejected(bad_row):
     with pytest.raises(ValueError):
         read_profile("timestamp,load_l1_kw,pv_l1_kw\n" + bad_row + "\n", demo_scenario(1))
@@ -139,9 +174,14 @@ def test_seeded_replay_conserves_energy_and_bounds():
     randomizer = random.Random(42)
     for phases in (1, 3):
         scenario = demo_scenario(phases)
-        samples = [Sample(START + timedelta(minutes=15 * i),
-                          tuple(randomizer.random() * 4 for _ in range(phases)),
-                          tuple(randomizer.random() * 5 for _ in range(phases))) for i in range(400)]
+        samples = [
+            Sample(
+                START + timedelta(minutes=15 * i),
+                tuple(randomizer.random() * 4 for _ in range(phases)),
+                tuple(randomizer.random() * 5 for _ in range(phases)),
+            )
+            for i in range(400)
+        ]
         result = simulate(scenario, samples)
         assert result["energy_balance_error_kwh"] == pytest.approx(0, abs=1e-8)
         assert canonical(result) == canonical(simulate(scenario, samples))
@@ -192,7 +232,9 @@ def test_customer_directories_are_separate(tmp_path):
     assert build_project(tmp_path, "b").is_relative_to(b)
 
 
-@pytest.mark.parametrize("project_id", ["../other", "/tmp/test", "Case A", "x/y", "x\\y", "<script>", ""])
+@pytest.mark.parametrize(
+    "project_id", ["../other", "/tmp/test", "Case A", "x/y", "x\\y", "<script>", ""]
+)
 def test_unsafe_ids_rejected(tmp_path, project_id):
     with pytest.raises(ValueError):
         init_project(tmp_path, project_id)

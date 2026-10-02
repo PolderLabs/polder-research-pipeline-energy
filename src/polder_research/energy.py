@@ -16,7 +16,7 @@ import re
 import sys
 import tempfile
 from dataclasses import asdict, dataclass, fields
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -24,7 +24,13 @@ from typing import Any
 MODEL_VERSION = "energy-ac-self-consumption-v0.1"
 NOTICE = "CONCEPT ONLY - NOT FOR INSTALLATION"
 PROJECT_KEYS = {
-    "schema_version", "id", "data_class", "evidence_refs", "assumptions", "unknowns", "scenario"
+    "schema_version",
+    "id",
+    "data_class",
+    "evidence_refs",
+    "assumptions",
+    "unknowns",
+    "scenario",
 }
 
 
@@ -63,9 +69,15 @@ class Scenario:
         if self.topology == "three_phase_balanced" and self.battery_phase != 1:
             raise ValueError("battery_phase must be 1 (unused) for a balanced system")
         for name in (
-            "nominal_kwh", "minimum_soc", "maximum_soc", "initial_soc",
-            "charge_limit_kw_ac", "discharge_limit_kw_ac", "charge_efficiency",
-            "discharge_efficiency", "auxiliary_kw_ac",
+            "nominal_kwh",
+            "minimum_soc",
+            "maximum_soc",
+            "initial_soc",
+            "charge_limit_kw_ac",
+            "discharge_limit_kw_ac",
+            "charge_efficiency",
+            "discharge_efficiency",
+            "auxiliary_kw_ac",
         ):
             number(getattr(self, name), name)
         if self.nominal_kwh <= 0:
@@ -153,7 +165,9 @@ def profile_headers(phases: int) -> list[str]:
 def read_profile(text: str, scenario: Scenario) -> list[Sample]:
     reader = csv.DictReader(io.StringIO(text))
     if reader.fieldnames != profile_headers(scenario.grid_phases):
-        raise ValueError("CSV headers/order must be " + ",".join(profile_headers(scenario.grid_phases)))
+        raise ValueError(
+            "CSV headers/order must be " + ",".join(profile_headers(scenario.grid_phases))
+        )
     rows = []
     for line, record in enumerate(reader, start=2):
         try:
@@ -164,7 +178,7 @@ def read_profile(text: str, scenario: Scenario) -> list[Sample]:
                 raise ValueError("timestamp needs a UTC offset")
             load = tuple(float(record[f"load_l{i}_kw"]) for i in range(1, scenario.grid_phases + 1))
             pv = tuple(float(record[f"pv_l{i}_kw"]) for i in range(1, scenario.grid_phases + 1))
-            rows.append(Sample(timestamp.astimezone(timezone.utc), load, pv))
+            rows.append(Sample(timestamp.astimezone(UTC), load, pv))
         except (ValueError, TypeError, KeyError) as exc:
             raise ValueError(f"invalid CSV row {line}: {exc}") from exc
     validate_samples(rows, scenario)
@@ -178,8 +192,10 @@ def validate_samples(samples: list[Sample], scenario: Scenario) -> None:
     for sample in samples:
         if sample.timestamp.tzinfo is None or sample.timestamp.utcoffset() is None:
             raise ValueError("timestamps must be timezone-aware")
-        stamp = sample.timestamp.astimezone(timezone.utc)
-        if previous is not None and stamp - previous != timedelta(minutes=scenario.interval_minutes):
+        stamp = sample.timestamp.astimezone(UTC)
+        if previous is not None and stamp - previous != timedelta(
+            minutes=scenario.interval_minutes
+        ):
             raise ValueError("profile has duplicates, gaps, overlaps or unsorted timestamps")
         previous = stamp
         if len(sample.load_kw) != scenario.grid_phases or len(sample.pv_kw) != scenario.grid_phases:
@@ -208,10 +224,18 @@ def simulate(scenario: Scenario, samples: list[Sample]) -> dict[str, Any]:
     high = scenario.maximum_soc * scenario.nominal_kwh
     totals = dict.fromkeys(
         (
-            "load_kwh", "pv_kwh", "baseline_import_kwh", "baseline_export_kwh",
-            "grid_import_kwh", "grid_export_kwh", "charge_kwh_ac", "discharge_kwh_ac",
-            "conversion_loss_kwh", "auxiliary_kwh",
-        ), 0.0,
+            "load_kwh",
+            "pv_kwh",
+            "baseline_import_kwh",
+            "baseline_export_kwh",
+            "grid_import_kwh",
+            "grid_export_kwh",
+            "charge_kwh_ac",
+            "discharge_kwh_ac",
+            "conversion_loss_kwh",
+            "auxiliary_kwh",
+        ),
+        0.0,
     )
     peak_import = [0.0] * scenario.grid_phases
     peak_export = [0.0] * scenario.grid_phases
@@ -223,10 +247,18 @@ def simulate(scenario: Scenario, samples: list[Sample]) -> dict[str, Any]:
         charge = discharge = 0.0
         before = energy
         if net < 0:
-            charge = min(-net, scenario.charge_limit_kw_ac, max(0, high - energy) / (scenario.charge_efficiency * dt))
+            charge = min(
+                -net,
+                scenario.charge_limit_kw_ac,
+                max(0, high - energy) / (scenario.charge_efficiency * dt),
+            )
             energy += charge * scenario.charge_efficiency * dt
         else:
-            discharge = min(net, scenario.discharge_limit_kw_ac, max(0, energy - low) * scenario.discharge_efficiency / dt)
+            discharge = min(
+                net,
+                scenario.discharge_limit_kw_ac,
+                max(0, energy - low) * scenario.discharge_efficiency / dt,
+            )
             energy -= discharge * dt / scenario.discharge_efficiency
         allocated = scenario.allocation(charge - discharge)
         grid = [base[i] + aux[i] + allocated[i] for i in range(scenario.grid_phases)]
@@ -245,26 +277,40 @@ def simulate(scenario: Scenario, samples: list[Sample]) -> dict[str, Any]:
         for i, value in enumerate(grid):
             peak_import[i] = max(peak_import[i], value)
             peak_export[i] = max(peak_export[i], -value)
-        trace.append({
-            "timestamp": sample.timestamp.astimezone(timezone.utc).isoformat(),
-            "grid_kw_by_phase": grid, "charge_kw_ac": charge,
-            "discharge_kw_ac": discharge, "stored_kwh": energy,
-        })
+        trace.append(
+            {
+                "timestamp": sample.timestamp.astimezone(UTC).isoformat(),
+                "grid_kw_by_phase": grid,
+                "charge_kw_ac": charge,
+                "discharge_kw_ac": discharge,
+                "stored_kwh": energy,
+            }
+        )
     delta = energy - initial_energy
     balance = (
-        totals["pv_kwh"] + totals["grid_import_kwh"] - totals["load_kwh"]
-        - totals["grid_export_kwh"] - totals["auxiliary_kwh"]
-        - totals["conversion_loss_kwh"] - delta
+        totals["pv_kwh"]
+        + totals["grid_import_kwh"]
+        - totals["load_kwh"]
+        - totals["grid_export_kwh"]
+        - totals["auxiliary_kwh"]
+        - totals["conversion_loss_kwh"]
+        - delta
     )
     if abs(balance) > 1e-7 * max(1, totals["pv_kwh"] + totals["grid_import_kwh"]):
         raise ArithmeticError("energy conservation check failed")
     return {
-        "model_version": MODEL_VERSION, "release_status": "concept_only",
-        "interval_count": len(samples), "duration_hours": len(samples) * dt,
+        "model_version": MODEL_VERSION,
+        "release_status": "concept_only",
+        "interval_count": len(samples),
+        "duration_hours": len(samples) * dt,
         "first_interval_start": trace[0]["timestamp"],
-        "last_interval_end": (samples[-1].timestamp.astimezone(timezone.utc) + timedelta(minutes=scenario.interval_minutes)).isoformat(),
-        "totals": totals, "initial_stored_kwh": initial_energy,
-        "final_stored_kwh": energy, "stored_energy_delta_kwh": delta,
+        "last_interval_end": (
+            samples[-1].timestamp.astimezone(UTC) + timedelta(minutes=scenario.interval_minutes)
+        ).isoformat(),
+        "totals": totals,
+        "initial_stored_kwh": initial_energy,
+        "final_stored_kwh": energy,
+        "stored_energy_delta_kwh": delta,
         "energy_balance_error_kwh": balance,
         "peak_interval_import_kw_by_phase": peak_import,
         "peak_interval_export_kw_by_phase": peak_export,
@@ -273,7 +319,11 @@ def simulate(scenario: Scenario, samples: list[Sample]) -> dict[str, Any]:
 
 
 def topology_mermaid(scenario: Scenario) -> str:
-    title = "Single-phase storage" if scenario.topology == "single_phase" else "Balanced three-phase storage"
+    title = (
+        "Single-phase storage"
+        if scenario.topology == "single_phase"
+        else "Balanced three-phase storage"
+    )
     return f'''flowchart TB
     GRID["Utility grid - {scenario.grid_phases} phase(s)"] <--> METER["Whole-site measurement"]
     METER <--> BOARD["Main AC distribution"]
@@ -288,9 +338,15 @@ def topology_mermaid(scenario: Scenario) -> str:
 
 
 def topology_svg(scenario: Scenario, project_id: str) -> str:
-    label = "1-phase battery inverter" if scenario.topology == "single_phase" else "3-phase battery inverter system"
+    label = (
+        "1-phase battery inverter"
+        if scenario.topology == "single_phase"
+        else "3-phase battery inverter system"
+    )
+
     def box(x: int, y: int, w: int, text: str) -> str:
-        return f'<rect x="{x}" y="{y}" width="{w}" height="56" rx="5" fill="white" stroke="#334155"/><text x="{x+w/2}" y="{y+33}" text-anchor="middle">{escape(text)}</text>'
+        return f'<rect x="{x}" y="{y}" width="{w}" height="56" rx="5" fill="white" stroke="#334155"/><text x="{x + w / 2}" y="{y + 33}" text-anchor="middle">{escape(text)}</text>'
+
     parts = [
         '<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="700" viewBox="0 0 1100 700">',
         '<rect width="1100" height="700" fill="#f8fafc"/>',
@@ -299,7 +355,7 @@ def topology_svg(scenario: Scenario, project_id: str) -> str:
         f'<text x="40" y="72" fill="#b91c1c">{NOTICE}</text>',
         '<g fill="none" stroke="#334155" stroke-width="2">',
         '<path d="M550 166V204 M550 260V310 M400 338H290 M700 338H810 M550 366V442 M550 498V564"/>',
-        '</g>',
+        "</g>",
         box(400, 110, 300, f"Grid ({scenario.grid_phases} phases)"),
         box(400, 204, 300, "Whole-site meter / CTs"),
         box(400, 310, 300, "Main AC distribution"),
@@ -311,7 +367,7 @@ def topology_svg(scenario: Scenario, project_id: str) -> str:
         '<text x="570" y="541">Protected DC path + BMS</text>',
         '<text x="40" y="658" font-size="15">Functional connections only; PE/N, protection ratings, terminals and transfer switching are omitted.</text>',
         '<text x="40" y="682" font-size="15">No backup operation, code-compliance approval, or cable/fuse selection is provided by this diagram.</text>',
-        '</g></svg>\n',
+        "</g></svg>\n",
     ]
     return "\n".join(parts)
 
@@ -330,8 +386,19 @@ def project_path(root: Path, project_id: str) -> Path:
 
 def demo_scenario(phases: int) -> Scenario:
     return Scenario(
-        phases, "single_phase" if phases == 1 else "three_phase_balanced", 1,
-        10.0, 0.1, 0.9, 0.1, 3.0, 3.0, 0.95, 0.95, 0.02, 15,
+        phases,
+        "single_phase" if phases == 1 else "three_phase_balanced",
+        1,
+        10.0,
+        0.1,
+        0.9,
+        0.1,
+        3.0,
+        3.0,
+        0.95,
+        0.95,
+        0.02,
+        15,
     )
 
 
@@ -339,13 +406,18 @@ def demo_profile(scenario: Scenario) -> str:
     output = io.StringIO()
     writer = csv.writer(output, lineterminator="\n")
     writer.writerow(profile_headers(scenario.grid_phases))
-    start = datetime(2025, 6, 21, tzinfo=timezone.utc)
+    start = datetime(2025, 6, 21, tzinfo=UTC)
     for index in range(96):
         hour = index / 4
         solar = max(0, 4.5 * math.sin(math.pi * (hour - 6) / 12)) if 6 <= hour <= 18 else 0
         values: list[Any] = [(start + timedelta(minutes=15 * index)).isoformat()]
         for phase in range(scenario.grid_phases):
-            values.extend([0.4 + (1.0 if 17 <= hour < 22 and phase == 0 else 0), round(solar, 6) if phase == 0 else 0])
+            values.extend(
+                [
+                    0.4 + (1.0 if 17 <= hour < 22 and phase == 0 else 0),
+                    round(solar, 6) if phase == 0 else 0,
+                ]
+            )
         writer.writerow(values)
     return output.getvalue()
 
@@ -356,12 +428,15 @@ def init_project(root: Path, project_id: str, demo_phases: int | None = None) ->
         raise ValueError("project already exists; refusing to overwrite")
     scenario = demo_scenario(demo_phases) if demo_phases is not None else None
     project = {
-        "schema_version": 1, "id": project_id,
+        "schema_version": 1,
+        "id": project_id,
         "data_class": "synthetic" if scenario else "customer",
         "evidence_refs": [],
         "assumptions": [
             "Phase-summed interval-average active-power model; constant efficiencies; no backup or protection calculation.",
-            "All demo inputs are invented; not a measurement or a recommendation." if scenario else "No site values have been verified yet.",
+            "All demo inputs are invented; not a measurement or a recommendation."
+            if scenario
+            else "No site values have been verified yet.",
         ],
         "unknowns": [
             "Connection identity and main fuse rating; trace PV circuits and upstairs/cabin feeder.",
@@ -390,29 +465,46 @@ def init_project(root: Path, project_id: str, demo_phases: int | None = None) ->
 
 def report_markdown(project: dict[str, Any], result: dict[str, Any]) -> str:
     lines = [
-        f"# {project['id']} - {project['data_class']} concept", "", f"**{NOTICE}**", "",
-        "Generated from the same validated scenario as topology.svg and results.json.", "",
-        f"Model: `{MODEL_VERSION}`. Period: {result['duration_hours']:g} hours. No annualisation.", "",
-        "| Quantity | Value |", "|---|---:|",
+        f"# {project['id']} - {project['data_class']} concept",
+        "",
+        f"**{NOTICE}**",
+        "",
+        "Generated from the same validated scenario as topology.svg and results.json.",
+        "",
+        f"Model: `{MODEL_VERSION}`. Period: {result['duration_hours']:g} hours. No annualisation.",
+        "",
+        "| Quantity | Value |",
+        "|---|---:|",
     ]
     for name, value in result["totals"].items():
         lines.append(f"| {name} | {value:.6f} |")
     lines += [
         f"| initial_stored_kwh | {result['initial_stored_kwh']:.6f} |",
         f"| final_stored_kwh | {result['final_stored_kwh']:.6f} |",
-        f"| stored_energy_delta_kwh | {result['stored_energy_delta_kwh']:.6f} |", "",
-        "Initial/final stored energy must be accounted for before comparing economics.", "",
+        f"| stored_energy_delta_kwh | {result['stored_energy_delta_kwh']:.6f} |",
+        "",
+        "Initial/final stored energy must be accounted for before comparing economics.",
+        "",
         f"Peak **interval-average** import by phase (kW): `{result['peak_interval_import_kw_by_phase']}`.",
-        f"Peak **interval-average** export by phase (kW): `{result['peak_interval_export_kw_by_phase']}`.", "",
+        f"Peak **interval-average** export by phase (kW): `{result['peak_interval_export_kw_by_phase']}`.",
+        "",
         "These are not RMS currents, motor starting peaks or proof that a main fuse can be reduced.",
-        "The meter is assumed to sum phases; verify actual metering. No tariff or payback claim is calculated.", "",
-        "## Assumptions and unresolved work", "",
+        "The meter is assumed to sum phases; verify actual metering. No tariff or payback claim is calculated.",
+        "",
+        "## Assumptions and unresolved work",
+        "",
     ]
     # JSON-encode user text in a code block; escape fences so notes cannot alter the report structure.
     notes = canonical({k: project[k] for k in ("assumptions", "unknowns", "evidence_refs")})
-    lines += ["```json", notes.replace("`", "\\u0060").rstrip(), "```", "",
-              "Evidence references are pointers only: this prototype does not validate their existence, authority or review status.",
-              "No approvals are inferred from successful execution. Independent design review and commissioning remain outstanding.", ""]
+    lines += [
+        "```json",
+        notes.replace("`", "\\u0060").rstrip(),
+        "```",
+        "",
+        "Evidence references are pointers only: this prototype does not validate their existence, authority or review status.",
+        "No approvals are inferred from successful execution. Independent design review and commissioning remain outstanding.",
+        "",
+    ]
     return "\n".join(lines)
 
 
@@ -428,29 +520,45 @@ def build_project(root: Path, project_id: str) -> Path:
     if project["id"] != project_id:
         raise ValueError("project id differs from directory")
     if scenario is None:
-        raise ValueError("scenario is unknown; complete the survey and explicit concept inputs first")
+        raise ValueError(
+            "scenario is unknown; complete the survey and explicit concept inputs first"
+        )
     profile_bytes = profile_file.read_bytes()
     result = simulate(scenario, read_profile(profile_bytes.decode("utf-8-sig"), scenario))
+
     def sha(data: bytes) -> str:
         return hashlib.sha256(data).hexdigest()
+
     inputs = {
-        "project_sha256": sha(project_bytes), "profile_sha256": sha(profile_bytes),
-        "engine_sha256": sha(Path(__file__).read_bytes()), "model_version": MODEL_VERSION,
+        "project_sha256": sha(project_bytes),
+        "profile_sha256": sha(profile_bytes),
+        "engine_sha256": sha(Path(__file__).read_bytes()),
+        "model_version": MODEL_VERSION,
         "python_version": sys.version.split()[0],
     }
     run_id = sha(canonical(inputs).encode())
     outputs = {
-        "results.json": canonical(result), "report.md": report_markdown(project, result),
-        "topology.mmd": topology_mermaid(scenario), "topology.svg": topology_svg(scenario, project_id),
+        "results.json": canonical(result),
+        "report.md": report_markdown(project, result),
+        "topology.mmd": topology_mermaid(scenario),
+        "topology.svg": topology_svg(scenario, project_id),
     }
-    manifest = {"inputs": inputs, "run_id": run_id, "release_status": "concept_only",
-                "artifacts": {name: sha(text.encode()) for name, text in sorted(outputs.items())}}
+    manifest = {
+        "inputs": inputs,
+        "run_id": run_id,
+        "release_status": "concept_only",
+        "artifacts": {name: sha(text.encode()) for name, text in sorted(outputs.items())},
+    }
     destination = target / "runs" / run_id
     if destination.is_symlink() or destination.parent.is_symlink():
         raise ValueError("output symlinks are not supported")
     if destination.exists():
         expected = {**outputs, "manifest.json": canonical(manifest)}
-        if any((destination / name).is_symlink() or (destination / name).read_text(encoding="utf-8") != text for name, text in expected.items()):
+        if any(
+            (destination / name).is_symlink()
+            or (destination / name).read_text(encoding="utf-8") != text
+            for name, text in expected.items()
+        ):
             raise ValueError("existing run was modified; refusing to overwrite")
         return destination
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -466,7 +574,9 @@ def build_project(root: Path, project_id: str) -> Path:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=Path.cwd(), help="local workspace, never a server URL")
+    parser.add_argument(
+        "--root", type=Path, default=Path.cwd(), help="local workspace, never a server URL"
+    )
     sub = parser.add_subparsers(dest="command", required=True)
     init = sub.add_parser("init", help="create an unknown-valued customer project")
     init.add_argument("project_id")
