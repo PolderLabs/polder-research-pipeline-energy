@@ -1,79 +1,110 @@
-<p align="center">
-  <img src="docs/assets/polder-banner.svg" alt="Illustrated waterways and fields" width="100%">
-</p>
+# Polder Energy Engineering Workbench
 
-<p align="center">
-  <a href="https://github.com/PolderLabs/polder-research-pipeline/actions/workflows/ci.yml"><img src="https://github.com/PolderLabs/polder-research-pipeline/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status"></a>
-  <a href="https://github.com/PolderLabs/polder-research-pipeline/releases/latest"><img src="https://img.shields.io/github/v/release/PolderLabs/polder-research-pipeline?label=latest%20release" alt="Latest release"></a>
-  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.14%2B-377e68.svg" alt="Python 3.14 or newer"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-377e68.svg" alt="MIT License"></a>
-</p>
+**Research -> site survey -> reproducible calculations -> concept drawings ->
+reviewed engineering -> commissioning.**
 
-<h1 align="center">Polder Research Pipeline</h1>
+An energy-focused extension of Polder Research Pipeline for PolderLabs customer
+projects. It keeps the original local research/evidence foundation and adds a
+small, runnable AC-storage concept workbench. It is an alpha engineering tool,
+not an automatic installer, certification system or live energy controller.
 
-Polder gives your research a place to live. Keep sources, notes, evidence, and review decisions together in a workspace you can inspect, edit, and carry forward.
+Start with the [master plan](docs/energy/ENERGY_WORKBENCH_PLAN.md),
+[site survey](docs/energy/SITE_SURVEY.md),
+[calculation contract](docs/energy/CALCULATION_CONTRACT.md),
+[topology/drawing guide](docs/energy/TOPOLOGIES_AND_DRAWINGS.md),
+[source register](docs/energy/RESEARCH_SOURCES.md) and
+[implementation roadmap](docs/energy/ROADMAP.md).
 
-It is built for people doing ongoing research as well as teams who need a documented, protocol-led evidence review. The project is in alpha, so take a look around and check important findings against their sources.
+## Run a concept now
 
-## Get started
-
-You’ll need Python 3.14 or newer, Git, and `curl`. This installs the latest published release into a new directory, sets up a local environment, and starts a fresh research workspace:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/PolderLabs/polder-research-pipeline/main/install.sh \
-  | sh -s -- --target ./my-research
-
-cd ./my-research
-.venv/bin/polder-research serve
-```
-
-Open the local address printed in your terminal. The dashboard listens on `127.0.0.1` and helps you configure your workspace, manage the Laya model, and review research activity.
-
-Want the newest changes from `main` instead of a published release? Add `--unstable`:
+Use Python 3.14+ for this repository. Clone **this energy fork**, not the generic
+upstream installer (which has not yet been specialised for the energy workflow):
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/PolderLabs/polder-research-pipeline/main/install.sh \
-  | sh -s -- --unstable --target ./my-research
+git clone https://github.com/PolderLabs/polder-research-pipeline-energy.git
+cd polder-research-pipeline-energy
+python -m venv .venv
+# Activate .venv using your operating system's normal activation command.
+python -m pip install -e .
+
+polder-energy demo demo-single --phases 1
+polder-energy build demo-single
+polder-energy demo demo-three --phases 3
+polder-energy build demo-three
 ```
 
-The installer keeps the new workspace independent: it creates a local Git repository without a remote, and starts you with a blank project brief. See [`install.sh`](install.sh) for options such as `--without-laya`, `--with-dev`, and installing from a fork.
+The commands print the local project/output directories under
+`.research/energy/projects/`. Open `report.md` and `topology.svg` in the generated
+run directory. `results.json`, `topology.mmd` and `manifest.json` contain the same
+scenario's results, editable concept graph and provenance hashes.
 
-## Pick a research workflow
+Without installing a console entry point, the equivalent source command is:
 
-| If you’re… | Start here |
+```sh
+PYTHONPATH=src python -m polder_research.energy --help
+```
+
+Demos are invented data, not a customer design or a battery recommendation.
+For a real intake:
+
+```sh
+polder-energy init customer-a
+```
+
+This deliberately leaves `scenario` null. Complete the survey and explicit model
+inputs before building. The replay accepts a documented per-phase load/PV CSV,
+not arbitrary P1 data or annual bills. See the calculation contract. To compare
+one-phase storage on a three-phase supply, use `grid_phases: 3`,
+`topology: "single_phase"` and a verified/modelled `battery_phase` explicitly.
+
+## Implemented versus planned
+
+| Implemented now | Still requires development/review |
 |---|---|
-| Keeping up with a topic over time | Use the continuous research and knowledge-maintenance workflow. It supports bounded discovery and source processing; it does not claim exhaustive coverage. |
-| Planning a systematic evidence review | Read [Research methods](knowledge-base/00-home/research-methods.md) first. Freeze your protocol before searching, then record searches, screening, extraction, and appraisal as you go. |
-| Filing one paper, report, or other source | Follow the [research intake guide](knowledge-base/00-home/research-intake-guide.md) to register the original and connect your notes to it. |
+| Local case initialisation and synthetic demos | Canonical site/evidence schema and dashboard integration |
+| SOC/power/efficiency-aware self-consumption replay | Raw meter/PV adapters and full data-quality workflow |
+| Physical per-phase active-power reporting | RMS-current, protection, cable and fault calculations |
+| Hashed JSON/Markdown/Mermaid/SVG concept bundle | Reviewed CAD/SLD, cable schedule and final BOM |
+| Strict input/failure tests | Tariff optimisation, independently validated forecasts and payback |
+| Unconditional `concept_only` status | Authorised review, construction release and as-built lifecycle |
 
-Polder keeps source records and evidence in structured, validated files, with Markdown notes alongside them. The [evidence model](knowledge-base/00-home/evidence-model.md) explains how those pieces connect.
+The current three-phase replay is **balanced**. Net-zero power across phases does
+not mean every phase has zero current. No output certifies a grid-connection
+reduction, safe backup, suitable cable/fuse or compliant installation.
 
-## Your workspace and your data
+## Existing research foundation
 
-Polder runs on your machine. Research records, search exports, generated state, and local credentials live in the ignored `.research/` directory. The dashboard is for local use and has no login, so keep it on your own machine rather than exposing it to a network.
+The original research application remains available:
 
-Laya is the default classifier and runs locally after its model is downloaded. You can skip its large machine-learning dependencies during installation with `--without-laya`. A remote TypeSafe/Jev provider is available when you choose and configure it; classification data sent to that provider leaves your machine. Read the [provider guide](knowledge-base/03-system/classification-providers.md) and [security policy](SECURITY.md) before working with sensitive material.
+```sh
+polder-research serve
+```
 
-## A few useful places to look
+It supports local evidence/knowledge workflows; the new energy CLI is not yet a
+page in that dashboard. The dashboard is local and unauthenticated: do not expose
+it as a customer portal. Laya and remote classification remain optional upstream
+capabilities, not requirements for energy calculations.
 
-- [Knowledge base dashboard](knowledge-base/index.md) for the vault’s home page and navigation.
-- [Control panel guide](knowledge-base/03-system/control-panel.md) for dashboard setup and settings.
-- [Decision workflow guide](knowledge-base/03-system/decision-workflows.md) for bounded triage and prioritization proposals.
-- [Decision workflow guide](knowledge-base/03-system/decision-workflows.md) for bounded triage and prioritization proposals.
-- [Provenance model](knowledge-base/00-home/provenance-model.md) for how Polder records where information came from.
-- [Agent roles](agents/) for the documented research responsibilities and capabilities.
-- [Audit and roadmap](knowledge-base/AUDIT.md) for current limitations and planned work.
-- [Contributing](CONTRIBUTING.md) if you’d like to improve the project.
+See the [knowledge-base dashboard](knowledge-base/index.md),
+[research methods](knowledge-base/00-home/research-methods.md),
+[evidence model](knowledge-base/00-home/evidence-model.md),
+[AGENTS.md](AGENTS.md) and [energy agent contract](agents/energy-engineering-agent.md).
 
-## What Polder can and can’t claim
+## Customer privacy and safety
 
-Polder helps you keep a review trail, but it does not certify research quality or PRISMA compliance. Reviewers enter their own IDs; the software does not verify identities or independence. A generated review report indexes records and hashes, rather than packaging all the underlying evidence. See [Research methods](knowledge-base/00-home/research-methods.md) for the full process and its limits.
+This repository is public. Commit code, templates and synthetic fixtures only.
+Customer photos, bills, telemetry, addresses, meter IDs and contracts stay in
+private local workspaces. `.research/` is already gitignored, but that is not
+access control, encryption or a backup system. Unrelated customers should have
+separate workspace roots and controlled access. No customer material is sent to
+cloud services by the energy CLI.
 
-The project is in alpha and has not had an independent security audit. Validate findings against the original sources, especially before using them for consequential decisions.
+Every energy report/drawing is labelled **CONCEPT ONLY - NOT FOR INSTALLATION**.
+A complete installation requires source-backed design, appropriate competent
+review, site-specific permissions/requirements and measured commissioning.
+See [SECURITY.md](SECURITY.md) and the master plan.
 
-## Working on the project
-
-To set up a development environment, install the package and its development tools, then run the checks:
+## Development
 
 ```sh
 python -m pip install -r requirements-ci.txt
@@ -81,6 +112,10 @@ python -m pip install -e .
 ruff check .
 ruff format --check .
 PYTHONPATH=src pytest -q
+python scripts/emit_implementation_status.py
 ```
 
-Polder is available under the [MIT License](LICENSE).
+Run the focused new tests with `PYTHONPATH=src pytest -q tests/test_energy.py`.
+See [validation notes](docs/energy/VALIDATION.md) for the checks actually performed
+on this change and the limits of those checks. Existing research features and
+licensing are preserved; see [CONTRIBUTING.md](CONTRIBUTING.md) and [LICENSE](LICENSE).
