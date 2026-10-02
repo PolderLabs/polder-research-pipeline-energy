@@ -23,6 +23,7 @@ jev = ["typesafe-sdk==0.7.1"]
 
 [project.scripts]
 polder-research = "polder_research.scripts:main"
+polder-energy = "polder_research.energy:main"
 
 [build-system]
 requires = ["hatchling==1.32.4"]

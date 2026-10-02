@@ -10,6 +10,27 @@ tags:
 
 **Repository:** Polder Research Pipeline — a source-backed research and knowledge-maintenance system. It supports continuous intelligence and protocol-first systematic evidence review; those modes have different coverage and completion claims.
 
+## Energy customer work in this fork
+
+For energy projects, first read `docs/energy/ENERGY_WORKBENCH_PLAN.md` and
+`agents/energy-engineering-agent.md`. Use `docs/energy/SITE_SURVEY.md` for intake
+and `docs/energy/CALCULATION_CONTRACT.md` for the exact scope of `polder-energy`.
+The energy CLI currently produces concept-only calculations and functional drawings;
+the canonical evidence/schema bridge and dashboard integration are planned, not complete.
+
+**Customer privacy overrides the public-vault raw-drop workflow below:** keep bills,
+photographs, telemetry, addresses, meter/serial identifiers and contracts in a
+private local workspace, never `knowledge-base/90-inbox/raw/` in this public repo.
+Only code, reusable templates, reviewed anonymised knowledge and explicitly synthetic
+fixtures belong in Git. `.research/` being ignored is not access control or encryption.
+Do not expose the unauthenticated local dashboard as a customer portal.
+
+Unknown values remain unknown. Do not equate a branch breaker to a utility fuse,
+two PV labels to two verified inverters, or phase-summed energy savings to physical
+per-phase fuse relief. No agent or successful unit test grants installation approval.
+Run `pytest -q tests/test_energy.py` plus the existing repository checks after changes;
+regenerate `knowledge-base/AUDIT.md` with the existing script when test counts change.
+
 ## Entry point
 
 **Dashboard:** `knowledge-base/index.md` — vault stats, domain coverage, inbox status, health, self-evolution metrics.
