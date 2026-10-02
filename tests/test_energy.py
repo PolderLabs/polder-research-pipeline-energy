@@ -23,6 +23,7 @@ from polder_research.energy import (
     read_json,
     read_profile,
     simulate,
+    topology_mermaid,
     topology_svg,
     validate_project,
 )
@@ -224,6 +225,15 @@ def test_demo_bundle_determinism_hashes_and_notice(tmp_path, phases):
         build_project(tmp_path, "demo")
 
 
+def test_newline_only_artifact_tampering_is_detected(tmp_path):
+    init_project(tmp_path, "demo", 1)
+    output = build_project(tmp_path, "demo")
+    report = output / "report.md"
+    report.write_bytes(report.read_bytes().replace(b"\n", b"\r\n"))
+    with pytest.raises(ValueError, match="modified"):
+        build_project(tmp_path, "demo")
+
+
 def test_customer_directories_are_separate(tmp_path):
     a = init_project(tmp_path, "a", 1)
     b = init_project(tmp_path, "b", 3)
@@ -257,6 +267,16 @@ def test_svg_escapes_labels():
     document = topology_svg(demo_scenario(1), "<injected>")
     ET.fromstring(document)
     assert "&lt;injected&gt;" in document
+
+
+def test_single_phase_topology_identifies_battery_phase():
+    phase_one = demo_scenario(3)
+    phase_two = replace(phase_one, topology="single_phase", battery_phase=2)
+    phase_one = replace(phase_one, topology="single_phase", battery_phase=1)
+    assert "on L1" in topology_svg(phase_one, "case")
+    assert "on L2" in topology_svg(phase_two, "case")
+    assert topology_svg(phase_one, "case") != topology_svg(phase_two, "case")
+    assert topology_mermaid(phase_one) != topology_mermaid(phase_two)
 
 
 def test_demo_profile_contract():

@@ -320,7 +320,7 @@ def simulate(scenario: Scenario, samples: list[Sample]) -> dict[str, Any]:
 
 def topology_mermaid(scenario: Scenario) -> str:
     title = (
-        "Single-phase storage"
+        f"Single-phase storage on L{scenario.battery_phase}"
         if scenario.topology == "single_phase"
         else "Balanced three-phase storage"
     )
@@ -339,7 +339,7 @@ def topology_mermaid(scenario: Scenario) -> str:
 
 def topology_svg(scenario: Scenario, project_id: str) -> str:
     label = (
-        "1-phase battery inverter"
+        f"1-phase battery inverter on L{scenario.battery_phase}"
         if scenario.topology == "single_phase"
         else "3-phase battery inverter system"
     )
@@ -537,27 +537,27 @@ def build_project(root: Path, project_id: str) -> Path:
         "python_version": sys.version.split()[0],
     }
     run_id = sha(canonical(inputs).encode())
-    outputs = {
+    output_text = {
         "results.json": canonical(result),
         "report.md": report_markdown(project, result),
         "topology.mmd": topology_mermaid(scenario),
         "topology.svg": topology_svg(scenario, project_id),
     }
+    outputs = {name: text.encode("utf-8") for name, text in output_text.items()}
     manifest = {
         "inputs": inputs,
         "run_id": run_id,
         "release_status": "concept_only",
-        "artifacts": {name: sha(text.encode()) for name, text in sorted(outputs.items())},
+        "artifacts": {name: sha(data) for name, data in sorted(outputs.items())},
     }
     destination = target / "runs" / run_id
     if destination.is_symlink() or destination.parent.is_symlink():
         raise ValueError("output symlinks are not supported")
     if destination.exists():
-        expected = {**outputs, "manifest.json": canonical(manifest)}
+        expected = {**outputs, "manifest.json": canonical(manifest).encode("utf-8")}
         if any(
-            (destination / name).is_symlink()
-            or (destination / name).read_text(encoding="utf-8") != text
-            for name, text in expected.items()
+            (destination / name).is_symlink() or (destination / name).read_bytes() != data
+            for name, data in expected.items()
         ):
             raise ValueError("existing run was modified; refusing to overwrite")
         return destination
@@ -565,9 +565,9 @@ def build_project(root: Path, project_id: str) -> Path:
     with tempfile.TemporaryDirectory(dir=destination.parent, prefix=".build-") as tmp:
         staged = Path(tmp) / run_id
         staged.mkdir()
-        for name, text in outputs.items():
-            (staged / name).write_text(text, encoding="utf-8")
-        (staged / "manifest.json").write_text(canonical(manifest), encoding="utf-8")
+        for name, data in outputs.items():
+            (staged / name).write_bytes(data)
+        (staged / "manifest.json").write_bytes(canonical(manifest).encode("utf-8"))
         staged.rename(destination)
     return destination
 

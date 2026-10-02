@@ -131,6 +131,11 @@ same inputs/runtime reuse an identical bundle; modified bundles are not overwrit
 Hashes detect changes, not authorship or tamper-proof approval. Cross-platform
 bitwise identity across different Python versions is not claimed.
 
+The run bundle stores hashes, not snapshots, of `project.json` and `profile.csv`.
+Keep or archive those inputs separately if the run must remain replayable after
+the project files change or are moved. Single-phase topology drawings label the
+selected battery phase; they remain functional concepts, not verified wiring plans.
+
 All diagrams and reports say **CONCEPT ONLY - NOT FOR INSTALLATION**. The only
 implemented release status is `concept_only`; filling every input cannot promote it.
 
