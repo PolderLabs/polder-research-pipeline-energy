@@ -55,7 +55,14 @@ cannot infer that feasibility from the energy dataset.
 
 Reject NaN, infinity, booleans masquerading as numbers, negative demand/generation,
 invalid SOC bounds and malformed configuration. This first implementation uses
-strict Python data validation; a canonical schema/workflow bridge is planned.
+the canonical Draft 2020-12 schema at `schemas/energy-project.schema.json` through
+`SchemaRegistry` for both init and build, followed by strict Python scenario validation.
+The schema defines the closed v1 envelope and field bounds; Python additionally
+rejects non-finite numbers and float-valued integer fields and enforces cross-field
+SOC and topology constraints. Both validations are required. A separate CLI `--root`
+selects the private workspace, not a replacement schema policy. Installed wheels
+carry the canonical schema. The evidence/workflow bridge remains planned; this
+change adds no fields, defaults, migrations or release statuses.
 
 ## Measurement CSV
 
@@ -81,6 +88,36 @@ before checking spacing. Gaps, duplicate/unsorted timestamps and column mismatch
 are rejected, not silently interpolated. The final interval ends one configured
 interval after the last timestamp. The user must verify that the original export
 uses these semantics. Raw P1/supplier/PVGIS adapters are not implemented yet.
+
+### Read-only profile preflight
+
+Run `polder-energy --root /private/workspace preflight PROJECT_ID` before building.
+It prints deterministic JSON to stdout and writes no files or run directories.
+Exit 0 means the CSV passes this exact contract; exit 2 means rejected data or an
+input/configuration error. CSV failures are JSON reports; missing files, invalid
+project configuration and unknown scenarios are errors on stderr. A complete
+scenario is required to supply explicit phase count and interval duration.
+
+The report includes input byte hashes and data class, declared units and phase
+channels, interval count, UTC start and exclusive end, covered duration, and kWh
+integrals per input channel (`channel_energy_kwh` keys retain the CSV column names).
+Rejected profiles have no energy totals or coverage: nothing is repaired, filled,
+interpolated, annualised or silently split among phases. Unrepresentable time or
+energy totals are also rejected by the report. The existing build/parser gate is
+unchanged and remains authoritative for builds.
+
+Errors use logical CSV record numbers (header is row 1), not physical line numbers
+for quoted multiline records. Header mismatch stops inspection. Row diagnostics
+collect multiple invalid records; spacing checks resume between valid adjacent
+records after a malformed record, so the list is not an exhaustive defect inventory.
+Blank lines retain the existing CSV parser behaviour. The final interval is counted
+in full; this is observed-file coverage, not completeness against a requested date
+range. There is no requested date range in the v1 contract.
+
+Passing syntax does not establish source accuracy: original units, phase assignments
+and the physical load/PV meter boundaries remain explicitly unverified. Agents must
+check them against private source evidence; this command is not a vendor adapter,
+installation approval, simulation or permission to publish customer telemetry.
 
 ## Equations and accounting
 
@@ -118,6 +155,20 @@ Initial stored energy is not free recurring value. Every run discloses its initi
 and final energy. Short-period results are not annualised and are not converted to
 payback. For option economics, compare equivalent SOC boundaries or explicitly
 account for the terminal energy, then apply a separately validated tariff model.
+
+Each supported one-phase or balanced-three-phase storage replay reports an
+arithmetic comparison against a no-storage baseline calculated from the **same
+validated samples and interval window**. It includes phase-summed meter import/
+export and per-phase interval-average peaks. The baseline has no battery
+auxiliaries; the storage concept includes its configured auxiliary demand and
+conversion losses. Signed `baseline_minus_concept_*` values are differences, not
+savings, guaranteed performance, or an economics result. The comparison is not
+normalized for battery energy: inspect its initial/final/delta stored energy and
+losses before interpreting it. Only one storage topology is simulated per run;
+comparing alternative storage concepts requires separate, explicitly linked runs
+with identical profile hashes and disclosed model/scenario inputs; project hashes
+will differ when their scenario differs. Per-phase active-power peaks are not
+RMS-current or fuse/protection evidence.
 
 `dc_current_a(P_ac_kw, V_battery_min, efficiency)` implements
 `1000 * P_ac_kw / (V_battery_min * efficiency)`. It is a steady-state estimate only,

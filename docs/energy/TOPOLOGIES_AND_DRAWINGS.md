@@ -97,14 +97,27 @@ Energy diagrams alone cannot validate PE/N connections or electrical code compli
 
 | Maturity | Deliverable | Status |
 |---|---|---|
-| Now | SVG/Mermaid functional topology from the calculation scenario | Implemented, concept only |
+| Now | SVG/Mermaid topology plus editable draw.io concept sheet and QElectroTech functional-block schematic | Generated from a shared concept model; concept only |
 | Next | Typed graph, stable component IDs and preliminary equipment schedule | Planned |
 | Design | Reviewed single-line, cable/terminal and protection schedules | Planned; technical review required |
 | Build | Editable CAD files, released BOM, settings and installation method | Planned; approvals required |
 | As-built | Verified revisions, test records and deviations | Planned |
 
-Use QElectroTech as a candidate schematic/panel tool, not a simulator (S7).
-Keep native editable files plus review exports. CAD drawings, reports and BOMs must
-carry the same project revision and source-calculation references. A dimensioned
-cabin plan requires surveyed dimensions and equipment clearance requirements;
-the v0 functional SVG is not a cabin layout or a standard-compliant SLD.
+The current run bundle contains `concept-sheet.drawio` (editable customer-facing
+concept), `concept-sheet.svg` (preview) and `electrical-schematic.qet` (editable
+generic functional blocks), generated from the same scenario and run revision.
+The QET prototype includes editable component labels and stable IDs, the full
+source run ID and supply/storage model facts. Its XML input-slot pairing and
+metadata are regression-tested; actual opening/rendering in the target QET editor
+remains unverified. Its schematic projects the shared power-edge subset; the local
+controller and dashed data/control links shown in the concept sheet are omitted.
+These checks do not constitute engineering approval.
+Open the native files in draw.io Desktop or QElectroTech; no hosted editor
+integration is used, so customer data does not need to be sent to an embedded web
+editor. Manual drawing edits do not flow back into the numerical model. The QET
+blocks are deliberately generic rather than standards-compliant symbols. Neither
+file defines cable paths, terminals, PE/N, protection, switching or backup modes.
+Keep QElectroTech as a candidate reviewed schematic/panel tool, not a simulator
+(S7). A dimensioned cabin plan requires surveyed dimensions and equipment clearance
+requirements; these v0 deliverables are not a cabin layout or a standard-compliant
+SLD.

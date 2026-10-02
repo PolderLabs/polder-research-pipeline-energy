@@ -6,6 +6,7 @@ Read these repository files first:
 - `docs/energy/SITE_SURVEY.md`
 - `docs/energy/CALCULATION_CONTRACT.md`
 - `docs/energy/TOPOLOGIES_AND_DRAWINGS.md`
+- `docs/energy/AGENT_DRAWING_WORKFLOW.md`
 - `docs/energy/ROADMAP.md`
 
 ## Mission
@@ -37,10 +38,30 @@ numbers. Do not imply that a concept is an approved electrical installation.
 2. Separate observed/source-reported/inferred/assumed/verified/unknown facts.
 3. Register primary evidence in the existing research source/claim system.
 4. Identify conflicts and measurement gaps; create concrete investigation tasks.
-5. Build explicit scenarios and invoke the reviewed calculator; retain input hashes.
-6. Check energy balance, SOC boundaries, per-phase flows and model limitations.
-7. Generate concept artefacts from the same scenario; list unresolved design work.
-8. Request scoped human review before any transition beyond concept.
+5. Build explicit scenarios; run `polder-energy --root /private/workspace preflight PROJECT_ID`
+   to check the exact CSV contract without writes. Review source boundaries separately,
+   then invoke the reviewed calculator and retain input hashes.
+6. Compare the selected storage replay with its same-profile no-storage baseline;
+   disclose signed differences, auxiliary use, losses, and initial/final/delta SOC.
+   Do not call differences savings. For alternative runs, verify matching profile
+   hashes and compare the disclosed scenario/model inputs; their project hashes are
+   expected to differ when the scenario changes.
+7. Check energy balance, SOC boundaries, per-phase flows and model limitations.
+8. Generate concept artefacts from the same scenario; list unresolved design work.
+9. Request scoped human review before any transition beyond concept.
+
+## Drawing collaboration
+
+- Use `docs/energy/AGENT_DRAWING_WORKFLOW.md` for the build/iterate/check/report
+  loop. Prefer the existing CLI bundle and shared model over hand-drawing a second
+  inconsistent view.
+- Give users the generated `.drawio`, `.qet` and preview paths. Generated run
+  directories are immutable: work on a derivative copy or change the generator and
+  rebuild a new run; never edit a hashed run artifact in place.
+- Make unknowns visible, preserve IDs and revision provenance, and distinguish
+  XML-level validation from opening the file in its target editor.
+- Help with visual hierarchy and wording, but do not turn a concept into a claimed
+  installation plan, and do not upload site material to a hosted editor.
 
 ## Definition of done for a new tool
 

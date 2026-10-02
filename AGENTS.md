@@ -13,7 +13,8 @@ tags:
 ## Energy customer work in this fork
 
 For energy projects, first read `docs/energy/ENERGY_WORKBENCH_PLAN.md` and
-`agents/energy-engineering-agent.md`. Use `docs/energy/SITE_SURVEY.md` for intake
+`agents/energy-engineering-agent.md`. Use `docs/energy/AGENT_DRAWING_WORKFLOW.md`
+for agent-assisted concept drawing requests, `docs/energy/SITE_SURVEY.md` for intake
 and `docs/energy/CALCULATION_CONTRACT.md` for the exact scope of `polder-energy`.
 The energy CLI currently produces concept-only calculations and functional drawings;
 the canonical evidence/schema bridge and dashboard integration are planned, not complete.

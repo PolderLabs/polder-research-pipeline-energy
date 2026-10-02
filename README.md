@@ -34,9 +34,17 @@ polder-energy build demo-three
 ```
 
 The commands print the local project/output directories under
-`.research/energy/projects/`. Open `report.md` and `topology.svg` in the generated
-run directory. `results.json`, `topology.mmd` and `manifest.json` contain the same
-scenario's results, editable concept graph and provenance hashes.
+`.research/energy/projects/`. Open `report.md`, `topology.svg` or the
+`concept-sheet.svg` preview in the generated run directory. Edit the customer-facing
+concept in `concept-sheet.drawio` with draw.io Desktop, or the functional-block
+electrical schematic in `electrical-schematic.qet` with QElectroTech. These are
+offline-friendly native files; drawings are concept-only and edits are not synced
+back into calculations. `results.json`, `topology.mmd` and `manifest.json` contain
+the same scenario's results and provenance hashes.
+
+For an agent-assisted drawing request, see
+[`docs/energy/AGENT_DRAWING_WORKFLOW.md`](docs/energy/AGENT_DRAWING_WORKFLOW.md)
+for the brief fields, immutable-run workflow and validation limits.
 
 Without installing a console entry point, the equivalent source command is:
 

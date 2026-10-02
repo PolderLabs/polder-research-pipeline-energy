@@ -56,20 +56,28 @@ The `polder_research.energy` module and `polder-energy` entry point provide:
 - Local customer-project initialisation with an unknown scenario, not invented ratings.
 - Explicitly synthetic one-phase and three-phase demonstration data.
 - Strict input-field, numeric and timestamp validation.
+- Canonical Draft 2020-12 validation for the existing v1 project envelope.
+- Read-only exact-contract CSV preflight with UTC coverage, per-channel kWh,
+  input hashes and explicit unverified source boundaries.
 - AC self-consumption replay with charge/discharge limits, SOC bounds, conversion
   efficiencies, auxiliary consumption, and per-phase active-power accounting.
+- Same-profile no-storage baseline comparison with signed import/export differences,
+  SOC/loss/auxiliary disclosure and per-phase interval-average peaks.
 - A phase-summed meter model while retaining physical power flows on every phase.
-- Deterministic JSON results, Markdown report, Mermaid and SVG concept topology.
+- Deterministic JSON results, Markdown report, Mermaid/SVG, editable draw.io concept
+  sheet and generic functional-block QElectroTech export.
 - Content hashes for inputs, engine source and generated outputs.
 - Refusal to overwrite an existing project or a modified generated run.
 - An unconditional `concept_only` release status.
 
 This is not yet a full site graph, CAD application, authenticated approval system,
-network protection solver, tariff optimiser or live energy-management controller.
-Evidence references are carried as pointers; they are not yet resolved against
-source records. The prototype uses typed validation; canonical JSON-schema and
-workflow adapters are the next integration milestone. Its local file workflow
-is not a multi-user transaction system.
+network protection solver, multi-option optimizer, tariff model or live
+energy-management controller. Evidence references are carried as pointers; they
+are not yet resolved against source records. The project envelope schema is
+validated, but site/equipment facts and workflow/evidence integration remain
+planned. The QElectroTech XML has structural tests but has not been opened/rendered
+in the target editor. Its local file workflow is not a multi-user transaction
+system.
 
 ## 4. Initial customer scope
 
@@ -219,12 +227,17 @@ schedule, BOM and commissioning checklist. Separate AC power, DC power, protecti
 earth and communications. Draw normal and island modes separately. Never infer a
 protective-earth arrangement from an energy-flow graph.
 
-Start with deterministic Mermaid/SVG concept outputs. Evaluate QElectroTech for
-reviewed schematics and panel layouts rather than building a CAD editor. Its own
-project states that it is a drawing tool, not a simulation engine. Preserve native
-editable files, revision IDs and cross-references back to the project model.
-See [TOPOLOGIES_AND_DRAWINGS.md](TOPOLOGIES_AND_DRAWINGS.md) and
-[RESEARCH_SOURCES.md](RESEARCH_SOURCES.md).
+The first prototype now emits a deterministic draw.io concept sheet, SVG preview
+and QElectroTech functional-block schematic alongside Mermaid/SVG topology. Both
+editable drawings share stable component IDs and the calculation run revision, but
+are not authoritative calculation inputs: manual edits do not flow back to the
+model. Use local desktop editors; do not embed a hosted editor before a data-privacy
+review. Keep QElectroTech as a candidate for reviewed schematics and panel layouts,
+not a simulation engine. Do not build an in-house CAD editor at this stage.
+Preserve native editable files, revision IDs and cross-references back to the
+project model. See [TOPOLOGIES_AND_DRAWINGS.md](TOPOLOGIES_AND_DRAWINGS.md) and
+[RESEARCH_SOURCES.md](RESEARCH_SOURCES.md) for the concept-only limits and tool
+references.
 
 Prioritise tools in this order: intake/data quality; replay; phase analysis;
 equipment compatibility; economic comparison; graph/schedule generation; electrical

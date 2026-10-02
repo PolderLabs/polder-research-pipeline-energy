@@ -19,6 +19,7 @@ permissions:
 
 jobs:
   lint:
+    if: github.repository == 'PolderLabs/polder-research-pipeline'
     name: Lint (ruff)
     runs-on: ubuntu-latest
     permissions:
@@ -40,6 +41,7 @@ jobs:
         run: ruff format --check .
 
   syntax-compat:
+    if: github.repository == 'PolderLabs/polder-research-pipeline'
     name: Python 3.13 syntax compatibility
     runs-on: ubuntu-latest
     permissions:
@@ -53,6 +55,7 @@ jobs:
         run: python -m compileall -q src scripts tests
 
   test:
+    if: github.repository == 'PolderLabs/polder-research-pipeline'
     name: Test (pytest)
     runs-on: ubuntu-latest
     permissions:
@@ -76,6 +79,7 @@ jobs:
         run: pytest -v
 
   wheel-smoke:
+    if: github.repository == 'PolderLabs/polder-research-pipeline'
     name: Wheel installation smoke check
     runs-on: ubuntu-latest
     permissions:
@@ -126,6 +130,7 @@ jobs:
           ( cd "$bare" && env -u PYTHONPATH "$environment/bin/polder-research" vault-audit )
 
   vault-audit:
+    if: github.repository == 'PolderLabs/polder-research-pipeline'
     name: Vault audit (clean = exit 0)
     runs-on: ubuntu-latest
     permissions:
@@ -149,6 +154,7 @@ jobs:
         run: python3 skills/obsidian-knowledgebase-curator/scripts/vault_audit.py
 
   schema-validate:
+    if: github.repository == 'PolderLabs/polder-research-pipeline'
     name: Schema validation and generated state
     runs-on: ubuntu-latest
     permissions:
@@ -212,6 +218,7 @@ jobs:
           fi
 
   secret-scan:
+    if: github.repository == 'PolderLabs/polder-research-pipeline'
     name: Secret scan (gitleaks)
     runs-on: ubuntu-latest
     permissions:
@@ -228,6 +235,7 @@ jobs:
       - name: Scan Git history
         run: "$(go env GOPATH)/bin/gitleaks git --redact --no-banner"
   implementation-status:
+    if: github.repository == 'PolderLabs/polder-research-pipeline'
     name: Implementation status block
     # AUDIT.md §27 — machine-verified status block. Runs after every other
     # CI job so the test count reflects what CI actually exercised. Emits

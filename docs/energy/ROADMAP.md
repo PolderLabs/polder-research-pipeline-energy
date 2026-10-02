@@ -13,22 +13,30 @@ bad input/timestamps, local-path safety and deterministic bundles.
 Not delivered: production release process, final electrical calculations, customer
 portal, full-year financial model, validated equipment catalogue or live controls.
 
-## E1 - Canonical site/evidence integration: next
+## E1 - Site/evidence integration: next (project envelope schema implemented)
 
-Reuse the existing schema registry, atomic/locking infrastructure, source records
-and workflow tasks. Introduce site/fact/equipment/measurement/scenario/review schemas
-with migrations. Replace v0's reference strings with resolvable source/segment IDs
-and scoped, immutable evidence snapshots. Add the energy section to the existing
-local dashboard; do not introduce a second frontend/backend stack.
+The current v1 energy project envelope now validates through the existing canonical
+Draft 2020-12 schema registry in init and build. This does not yet establish site,
+equipment, evidence or review schemas. Reuse existing atomic/locking infrastructure,
+source records and workflow tasks. Introduce typed site/fact/equipment/measurement/
+review records with safe migrations. Replace v1's reference strings with
+resolvable source/segment IDs and scoped, immutable evidence snapshots. Add the
+energy section to the existing local dashboard; do not introduce a second
+frontend/backend stack.
 
 Acceptance: an unknown main fuse or ambiguous meter boundary cannot become a
 verified fact; a changed source invalidates dependent scenarios/reviews; a fresh
 customer starts with no inherited values; the UI and CLI call the same validation.
 Use a real site only after owner consent and local data safeguards are established.
 
-## E2 - Measurement adapters and quality report
+## E2 - Exact-contract preflight implemented; measurement adapters remain planned
 
-Implement explicit adapters for the actual customer smart-meter/P1 and PV exports.
+The CLI now provides a read-only quality report for the exact per-phase interval-
+average-kW CSV contract. It reports syntax failures, UTC coverage, per-channel
+energy and hashes; source semantics remain explicitly unverified. This is not an
+adapter or proof of provenance.
+
+Next, implement explicitly scoped adapters for actual customer smart-meter/P1 and PV exports.
 Normalise interval kWh, cumulative registers and average kW correctly. Preserve
 source files, timezone/offsets, missing data and register-reset flags. Add PVGIS as
 an optional modelled-data adapter with pinned API/dataset provenance.
@@ -38,18 +46,25 @@ silently equated to export; no cross-meter aggregation; DST/reset/gap fixtures;
 no phase split is invented from a total-only meter. Raw exports and derived data
 stay private. A coarse dataset cannot certify short-duration peak behaviour.
 
-## E3 - Scenario comparison and economics
+## E3 - Same-profile baseline comparison implemented; multi-option economics remain planned
 
-Compare no battery, scheduling, phase redistribution, manufactured storage and DIY
-options. Sweep capacity/power with equal SOC boundary treatment. Add explicit tariff
-periods, tax/VAT mode, import/export charges and band thresholds; then degradation,
-replacement, maintenance and financing sensitivity. Add an independent numerical
-reference for the implemented dispatch model before more elaborate optimisation.
+Each replay now includes a same-profile no-storage baseline with aggregate
+import/export differences, per-phase active-power peaks, auxiliary/loss disclosure
+and the storage SOC delta. The comparison is arithmetic only and does not normalize
+stored energy or rank options.
 
-Acceptance: a hand-worked bill fixture matches; no duplicate arbitrage/self-use
-benefit; initial/final energy disclosed; no annualisation from a partial year unless
-explicitly labelled modelled; negative prices and zero-value storage work correctly.
-Connection tariff savings stay separate and require a reviewed feasibility case.
+Next compare no battery, scheduling, phase redistribution, manufactured storage and
+DIY options. Sweep capacity/power with equal SOC boundary treatment. Add explicit
+tariff periods, tax/VAT mode, import/export charges and band thresholds; then
+degradation, replacement, maintenance and financing sensitivity. Add an independent
+numerical reference for the implemented dispatch model before more elaborate
+optimization.
+
+Acceptance: comparison fixtures independently match the hand-worked same-profile
+baseline; no duplicate arbitrage/self-use benefit; initial/final energy disclosed;
+no annualisation from a partial year unless explicitly labelled modelled; negative
+prices and zero-value storage work correctly. Connection tariff savings stay
+separate and require a reviewed feasibility case.
 
 ## E4 - Equipment capabilities and typed electrical graph
 

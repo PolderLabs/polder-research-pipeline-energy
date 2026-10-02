@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://polder.dev/schemas/energy-project.schema.json",
+  "title": "Energy concept project v1",
+  "description": "Local project.json envelope, not an installation approval. Scenario semantic validation remains required, including finite numbers, strict integer types and cross-field SOC/topology constraints.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "data_class",
+    "evidence_refs",
+    "assumptions",
+    "unknowns",
+    "scenario"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "not": {
+        "pattern": "[\\r\\n]"
+      }
+    },
+    "data_class": {
+      "enum": [
+        "synthetic",
+        "customer"
+      ]
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/referenceText"
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/referenceText"
+      },
+      "minItems": 1
+    },
+    "unknowns": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/referenceText"
+      }
+    },
+    "scenario": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/scenario"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "referenceText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000,
+      "pattern": "\\S"
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grid_phases",
+        "topology",
+        "battery_phase",
+        "nominal_kwh",
+        "minimum_soc",
+        "maximum_soc",
+        "initial_soc",
+        "charge_limit_kw_ac",
+        "discharge_limit_kw_ac",
+        "auxiliary_kw_ac",
+        "charge_efficiency",
+        "discharge_efficiency",
+        "interval_minutes"
+      ],
+      "properties": {
+        "grid_phases": {
+          "type": "integer",
+          "enum": [
+            1,
+            3
+          ]
+        },
+        "topology": {
+          "enum": [
+            "single_phase",
+            "three_phase_balanced"
+          ]
+        },
+        "battery_phase": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "nominal_kwh": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "minimum_soc": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maximum_soc": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "initial_soc": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "charge_limit_kw_ac": {
+          "type": "number",
+          "minimum": 0
+        },
+        "discharge_limit_kw_ac": {
+          "type": "number",
+          "minimum": 0
+        },
+        "auxiliary_kw_ac": {
+          "type": "number",
+          "minimum": 0
+        },
+        "charge_efficiency": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "discharge_efficiency": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "interval_minutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        }
+      }
+    }
+  }
+}
