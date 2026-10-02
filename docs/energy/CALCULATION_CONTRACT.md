@@ -23,7 +23,7 @@ ageing, tariff optimisation, dynamic prices, export guarantees or construction a
 
 ## Project input: schema version 1
 
-`project.json` has exactly these keys:
+`project.json` has the following required keys and one optional additive field:
 
 | Field | Contract |
 |---|---|
@@ -31,6 +31,7 @@ ageing, tariff optimisation, dynamic prices, export guarantees or construction a
 | `id` | 1-64 lowercase letters/digits/hyphens; must match its directory |
 | `data_class` | `customer` or `synthetic` |
 | `evidence_refs` | List of reference strings; existence/relevance is not yet validated |
+| `site_facts` (optional) | Typed local facts and source/optional segment links as described below |
 | `assumptions` | Nonempty list of explicit assumptions |
 | `unknowns` | List of unresolved work items; empty does not constitute approval |
 | `scenario` | Null during intake, otherwise the complete scenario below |
@@ -61,8 +62,19 @@ The schema defines the closed v1 envelope and field bounds; Python additionally
 rejects non-finite numbers and float-valued integer fields and enforces cross-field
 SOC and topology constraints. Both validations are required. A separate CLI `--root`
 selects the private workspace, not a replacement schema policy. Installed wheels
-carry the canonical schema. The evidence/workflow bridge remains planned; this
-change adds no fields, defaults, migrations or release statuses.
+carry the canonical schema. The optional additive `site_facts` array records typed
+facts (`fact_id`, `subject`, `property`, scalar `value`, optional `unit`, status,
+and source/optional segment ID links). Statuses are `observed`, `source_reported`,
+`inference`, `assumption`, or `unknown`; the contract intentionally has no
+`verified` status. Observed/source-reported/inference facts require evidence links.
+Linked source and segment records are read locally, checked against canonical
+schemas and filename IDs, and pinned by byte hash in the preflight and build
+manifest. They are never registered or modified by this tool. Reports include
+fact values and evidence IDs/hashes, not source titles, locators or passage text.
+This establishes referential integrity and reproducibility, not truth, authority,
+engineering verification or approval. Legacy `evidence_refs` remain untouched and
+unvalidated. Broader site/equipment/measurement/review schemas and workflow support
+remain planned.
 
 ## Measurement CSV
 
@@ -177,14 +189,17 @@ not a fuse, conductor, contactor, cell-power or BMS sizing algorithm.
 ## Reproducibility and release limits
 
 The run ID hashes project bytes, profile bytes, engine source, model version and
-Python version. `manifest.json` records output SHA-256 hashes. Repeat runs with the
-same inputs/runtime reuse an identical bundle; modified bundles are not overwritten.
+Python version. When typed fact links exist, the run identity also includes the
+sorted evidence-record IDs, statuses and byte hashes. `manifest.json` records those
+evidence fingerprints and output SHA-256 hashes, not copied source or segment
+contents. Repeat runs with the same inputs/runtime reuse an identical bundle;
+modified bundles are not overwritten.
 Hashes detect changes, not authorship or tamper-proof approval. Cross-platform
 bitwise identity across different Python versions is not claimed.
 
-The run bundle stores hashes, not snapshots, of `project.json` and `profile.csv`.
-Keep or archive those inputs separately if the run must remain replayable after
-the project files change or are moved. Single-phase topology drawings label the
+The run bundle stores hashes, not snapshots, of `project.json`, `profile.csv`, or
+linked evidence records. Keep or archive those inputs and evidence separately if a
+run must remain replayable after the files change or are moved. Single-phase topology drawings label the
 selected battery phase; they remain functional concepts, not verified wiring plans.
 
 All diagrams and reports say **CONCEPT ONLY - NOT FOR INSTALLATION**. The only

@@ -13,16 +13,21 @@ bad input/timestamps, local-path safety and deterministic bundles.
 Not delivered: production release process, final electrical calculations, customer
 portal, full-year financial model, validated equipment catalogue or live controls.
 
-## E1 - Site/evidence integration: next (project envelope schema implemented)
+## E1 - Site/evidence integration: partial (typed fact links implemented)
 
-The current v1 energy project envelope now validates through the existing canonical
-Draft 2020-12 schema registry in init and build. This does not yet establish site,
-equipment, evidence or review schemas. Reuse existing atomic/locking infrastructure,
-source records and workflow tasks. Introduce typed site/fact/equipment/measurement/
-review records with safe migrations. Replace v1's reference strings with
-resolvable source/segment IDs and scoped, immutable evidence snapshots. Add the
-energy section to the existing local dashboard; do not introduce a second
-frontend/backend stack.
+The v1 envelope validates through the existing canonical Draft 2020-12 schema
+registry. An optional additive `site_facts` collection now validates typed
+observed/source-reported/inference/assumption/unknown facts and local source/segment
+links. Preflight and build check canonical local record schemas, filename identity,
+source acquisition and segment ownership. Builds pin linked record byte hashes in
+the run manifest; legacy `evidence_refs` remain unchanged. No source registration,
+remote access, or truth/approval decision is made. Existing atomic/locking
+infrastructure, research records and workflow tasks should be reused for remaining
+work; do not introduce a second frontend/backend stack.
+
+Remaining E1 scope: durable site/equipment/measurement/review records and safe
+migrations, task/workflow integration, scoped evidence snapshots across review
+lifecycles, and an energy section in the existing local dashboard.
 
 Acceptance: an unknown main fuse or ambiguous meter boundary cannot become a
 verified fact; a changed source invalidates dependent scenarios/reviews; a fresh
@@ -114,6 +119,50 @@ within a reviewed laboratory plan. Live control needs a separate threat/safety r
 Acceptance: fail-safe behaviour is demonstrated, not narrated; evidence captured;
 customer systems are not test beds for autonomous agent changes; firmware/settings
 versions retained; post-installation deviations feed reviewed regression fixtures.
+
+## Next must-haves (ranked remaining work)
+
+This order follows the gaps above, not a claim that E1–E7 are complete:
+
+1. **E1: durable lifecycle, safe migrations and dependency invalidation.** Typed
+   local fact links and pinned hashes exist; review lifecycle records and automatic
+   invalidation of dependent scenarios/reviews do not. Reuse canonical records and
+   atomic/locking infrastructure, prove migration rollback and fresh-project
+   isolation, then expose the same validation in the local dashboard. Establish
+   owner consent and private storage safeguards before onboarding customer data;
+   an ignored folder and the unauthenticated dashboard are not access controls.
+2. **E2: one evidence-backed measurement adapter, only after its input gate.**
+   Require an owner-approved real-format sample (kept private, or explicitly
+   synthetic for committed fixtures) and the primary format/measurement contract
+   before choosing a parser. Prove units, interval/timezone semantics, meter
+   boundaries and reconciliation using DST/reset/gap cases. Without those inputs,
+   stop at the implemented exact-contract CSV preflight; do not invent P1/PV
+   semantics, missing phase channels or permission to collect customer exports.
+3. **E3: independent dispatch reference before tariffs/economics.** Existing
+   same-profile baseline arithmetic is not an independent replay reference or an
+   economic model. Cross-check dispatch and equal-SOC comparison boundaries first;
+   only then add option sweeps and sourced, dated tariff assumptions. Keep partial
+   periods and connection-charge feasibility limitations explicit.
+4. **E4: sourced equipment capabilities and typed graph.** Build on durable E1
+   identities and revision invalidation; require exact model/firmware evidence and
+   reject incompatible ports/phases. Shared concept IDs are not yet a validated
+   electrical graph, equipment catalogue or procurement BOM.
+5. **E5: independent method and drawing review.** Require licensed/applicable
+   primary methods and a competent technical reviewer before protection or
+   installation-design work. Close native-editor open/save/reopen verification;
+   XML tests alone do not validate rendering, electrical safety or site suitability.
+6. **E6: authorised human release and commissioning controls.** Defer installation
+   release until scoped reviewer authority, site-specific permissions, insurance
+   confirmations and auditable revision invalidation exist. Agents cannot approve
+   their own designs or treat a typed reviewer name as authenticated approval.
+7. **E7: approved bench-first verification.** Begin with read-only telemetry and a
+   reviewed laboratory plan after the preceding design/review gates. Defer live
+   control to separate explicit authorisation and threat/safety review; customer
+   installations are not autonomous fault-test targets.
+
+Customer-data onboarding, protection selection, installation approval and live
+control remain gated human/owner decisions, not automatic next CLI features.
+Safe local work can proceed with synthetic fixtures without crossing those gates.
 
 ## Suggested team split
 

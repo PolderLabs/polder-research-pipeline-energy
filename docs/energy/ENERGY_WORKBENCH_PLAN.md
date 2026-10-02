@@ -72,12 +72,15 @@ The `polder_research.energy` module and `polder-energy` entry point provide:
 
 This is not yet a full site graph, CAD application, authenticated approval system,
 network protection solver, multi-option optimizer, tariff model or live
-energy-management controller. Evidence references are carried as pointers; they
-are not yet resolved against source records. The project envelope schema is
-validated, but site/equipment facts and workflow/evidence integration remain
-planned. The QElectroTech XML has structural tests but has not been opened/rendered
-in the target editor. Its local file workflow is not a multi-user transaction
-system.
+energy-management controller. Legacy `evidence_refs` remain unresolved string
+pointers. Optional typed `site_facts` resolve local canonical source/segment
+references, validate their structure and relationships, and pin record hashes.
+This read-only provenance check does not establish fact truth or engineering
+approval. The project envelope and optional site facts are schema-validated;
+broader claim/equipment adjudication, approval workflows and dashboard integration
+remain planned. The QElectroTech XML has structural tests but target-editor
+rendering and open/save/reopen remain unverified. Its local file workflow is not
+a multi-user transaction system.
 
 ## 4. Initial customer scope
 

@@ -109,9 +109,115 @@ def validate_project(project: Any) -> Scenario | None:
     if type(project["schema_version"]) is not int:
         raise ValueError("unsupported schema_version")
     check_id(project["id"])
+    fact_ids = [fact["fact_id"] for fact in project.get("site_facts", [])]
+    if len(fact_ids) != len(set(fact_ids)):
+        raise ValueError("site_facts fact_id values must be unique")
+    for fact in project.get("site_facts", []):
+        if type(fact["value"]) is float and not math.isfinite(fact["value"]):
+            raise ValueError(f"site fact {fact['fact_id']} value must be finite")
     if project["scenario"] is None:
         return None
     return Scenario.from_dict(project["scenario"])
+
+
+def resolve_site_facts(root: Path, project: dict[str, Any]) -> dict[str, Any] | None:
+    """Validate local evidence links and return a content-pinned, non-sensitive snapshot."""
+    facts = project.get("site_facts", [])
+    if not facts or not any(fact["evidence"] for fact in facts):
+        return None
+
+    workspace = root.expanduser().resolve()
+    research_dir = workspace / ".research"
+    if research_dir.is_symlink():
+        raise ValueError("symlinked evidence workspace paths are not supported")
+    registry = package_registry()
+    source_snapshots: dict[str, dict[str, Any]] = {}
+    segment_snapshots: dict[str, dict[str, Any]] = {}
+
+    def record(kind: str, record_id: str) -> tuple[dict[str, Any], str]:
+        directory = research_dir / ("sources" if kind == "source" else "segments")
+        path = directory / f"{record_id}.json"
+        if directory.is_symlink() or path.is_symlink():
+            raise ValueError(f"symlinked {kind} evidence paths are not supported")
+        try:
+            raw = path.read_bytes()
+        except FileNotFoundError:
+            raise ValueError(f"missing {kind} evidence record {record_id}") from None
+        except OSError:
+            raise ValueError(f"cannot read {kind} evidence record {record_id}") from None
+        try:
+            value = read_json(raw.decode("utf-8"))
+        except UnicodeError:
+            raise ValueError(f"invalid UTF-8 in {kind} evidence record {record_id}") from None
+        except ValueError:
+            raise ValueError(f"invalid JSON in {kind} evidence record {record_id}") from None
+        try:
+            registry.validate(kind, value)
+        except SchemaError:
+            errors = registry.iter_record_errors(kind, value)
+            error_path = errors[0]["path"] if errors else ""
+            # Nested schema maps may have private, user-controlled keys. Report
+            # only the canonical top-level field, never an arbitrary path segment.
+            location = error_path.partition(".")[0] or "<root>"
+            raise ValueError(
+                f"invalid {kind} evidence record {record_id} (schema validation at {location})"
+            ) from None
+        try:
+            registry.validate_filename_identity(kind, path.name, value)
+        except SchemaError:
+            raise ValueError(
+                f"invalid {kind} evidence record {record_id} (filename identity mismatch)"
+            ) from None
+        return value, hashlib.sha256(raw).hexdigest()
+
+    for fact in facts:
+        for link in fact["evidence"]:
+            source_id = link["source_id"]
+            if not re.fullmatch(
+                r"src_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}",
+                source_id,
+            ):
+                raise ValueError("invalid source evidence ID")
+            if source_id not in source_snapshots:
+                source, source_hash = record("source", source_id)
+                acquisition_status = source.get("acquisition_status")
+                if acquisition_status is None:
+                    acquisition_status = (
+                        "unacquired" if source["source_status"] == "unacquired" else "acquired"
+                    )
+                if acquisition_status != "acquired":
+                    raise ValueError(f"source evidence {source_id} is not acquired")
+                source_snapshots[source_id] = {
+                    "source_id": source_id,
+                    "source_status": source["source_status"],
+                    "acquisition_status": acquisition_status,
+                    "sha256": source_hash,
+                }
+            segment_id = link.get("segment_id")
+            if segment_id:
+                if not re.fullmatch(
+                    r"seg_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}",
+                    segment_id,
+                ):
+                    raise ValueError("invalid segment evidence ID")
+                if segment_id not in segment_snapshots:
+                    segment, segment_hash = record("segment", segment_id)
+                    segment_snapshots[segment_id] = {
+                        "segment_id": segment_id,
+                        "source_id": segment["source_id"],
+                        "sha256": segment_hash,
+                    }
+                if segment_snapshots[segment_id]["source_id"] != source_id:
+                    raise ValueError(
+                        f"segment evidence {segment_id} does not belong to source {source_id}"
+                    )
+
+    if not source_snapshots:
+        return None
+    return {
+        "sources": [source_snapshots[key] for key in sorted(source_snapshots)],
+        "segments": [segment_snapshots[key] for key in sorted(segment_snapshots)],
+    }
 
 
 def check_id(value: Any) -> str:
@@ -295,6 +401,7 @@ def preflight_project(root: Path, project_id: str) -> dict[str, Any]:
     project_bytes = project_file.read_bytes()
     project = read_json(project_bytes.decode("utf-8"))
     scenario = validate_project(project)
+    evidence_snapshot = resolve_site_facts(root, project)
     if project["id"] != project_id:
         raise ValueError("project id differs from directory")
     if scenario is None:
@@ -306,6 +413,8 @@ def preflight_project(root: Path, project_id: str) -> dict[str, Any]:
         "profile_sha256": hashlib.sha256(profile_bytes).hexdigest(),
         "data_class": project["data_class"],
     }
+    if evidence_snapshot is not None:
+        report["inputs"]["evidence_snapshot"] = evidence_snapshot
     return report
 
 
@@ -1214,7 +1323,9 @@ def init_project(root: Path, project_id: str, demo_phases: int | None = None) ->
     return target
 
 
-def report_markdown(project: dict[str, Any], result: dict[str, Any]) -> str:
+def report_markdown(
+    project: dict[str, Any], result: dict[str, Any], evidence_snapshot: dict[str, Any] | None = None
+) -> str:
     lines = [
         f"# {project['id']} - {project['data_class']} concept",
         "",
@@ -1273,6 +1384,37 @@ def report_markdown(project: dict[str, Any], result: dict[str, Any]) -> str:
         "## Assumptions and unresolved work",
         "",
     ]
+    if project.get("site_facts"):
+        facts = [
+            {
+                key: fact[key]
+                for key in ("fact_id", "subject", "property", "value", "unit", "status", "evidence")
+                if key in fact
+            }
+            for fact in project["site_facts"]
+        ]
+        lines += [
+            "### Typed site facts",
+            "",
+            "Statuses describe the evidence basis, not engineering verification or approval.",
+            "Source and segment records are referenced only by ID; their private contents are not copied into this report.",
+            "",
+            "```json",
+            canonical(facts).replace("`", "\\u0060").rstrip(),
+            "```",
+            "",
+        ]
+        if evidence_snapshot is not None:
+            lines += ["Evidence record fingerprints (SHA-256):", ""]
+            for item in evidence_snapshot["sources"]:
+                lines.append(
+                    f"- Source `{item['source_id']}` ({item['source_status']}; {item['acquisition_status']}): `{item['sha256']}`."
+                )
+            for item in evidence_snapshot["segments"]:
+                lines.append(
+                    f"- Segment `{item['segment_id']}` for `{item['source_id']}`: `{item['sha256']}`."
+                )
+            lines.append("")
     # JSON-encode user text in a code block; escape fences so notes cannot alter the report structure.
     notes = canonical({k: project[k] for k in ("assumptions", "unknowns", "evidence_refs")})
     lines += [
@@ -1280,7 +1422,7 @@ def report_markdown(project: dict[str, Any], result: dict[str, Any]) -> str:
         notes.replace("`", "\\u0060").rstrip(),
         "```",
         "",
-        "Evidence references are pointers only: this prototype does not validate their existence, authority or review status.",
+        "Legacy evidence_refs remain unvalidated pointers. Typed site-fact evidence IDs are checked against local canonical records, but that check does not establish authority, truth, or engineering review.",
         "No approvals are inferred from successful execution. Independent design review and commissioning remain outstanding.",
         "",
     ]
@@ -1296,6 +1438,7 @@ def build_project(root: Path, project_id: str) -> Path:
     project_bytes = project_file.read_bytes()
     project = read_json(project_bytes.decode("utf-8"))
     scenario = validate_project(project)
+    evidence_snapshot = resolve_site_facts(root, project)
     if project["id"] != project_id:
         raise ValueError("project id differs from directory")
     if scenario is None:
@@ -1315,11 +1458,13 @@ def build_project(root: Path, project_id: str) -> Path:
         "model_version": MODEL_VERSION,
         "python_version": sys.version.split()[0],
     }
+    if evidence_snapshot is not None:
+        inputs["evidence_snapshot"] = evidence_snapshot
     run_id = sha(canonical(inputs).encode())
     drawing_model = concept_model(project_id, scenario, run_id)
     output_text = {
         "results.json": canonical(result),
-        "report.md": report_markdown(project, result),
+        "report.md": report_markdown(project, result, evidence_snapshot),
         "topology.mmd": topology_mermaid(scenario),
         "topology.svg": topology_svg(scenario, project_id),
         "concept-sheet.drawio": concept_sheet_drawio(drawing_model),

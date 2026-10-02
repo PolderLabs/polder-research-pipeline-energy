@@ -17,7 +17,9 @@ For energy projects, first read `docs/energy/ENERGY_WORKBENCH_PLAN.md` and
 for agent-assisted concept drawing requests, `docs/energy/SITE_SURVEY.md` for intake
 and `docs/energy/CALCULATION_CONTRACT.md` for the exact scope of `polder-energy`.
 The energy CLI currently produces concept-only calculations and functional drawings;
-the canonical evidence/schema bridge and dashboard integration are planned, not complete.
+bounded typed local `site_facts`, canonical schema validation and linked evidence
+record hashing are implemented. Broader evidence lifecycle and dashboard integration
+remain planned; local provenance checks do not establish fact truth or approval.
 
 **Customer privacy overrides the public-vault raw-drop workflow below:** keep bills,
 photographs, telemetry, addresses, meter/serial identifiers and contracts in a

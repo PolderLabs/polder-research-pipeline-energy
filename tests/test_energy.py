@@ -305,6 +305,251 @@ def test_customer_directories_are_separate(tmp_path):
     assert build_project(tmp_path, "b").is_relative_to(b)
 
 
+SOURCE_ID = "src_018f47a2-7c21-7abc-8def-123456789abc"
+OTHER_SOURCE_ID = "src_018f47a2-7c21-7abc-8def-123456789abd"
+SEGMENT_ID = "seg_018f47a2-7c21-7abc-8def-123456789abe"
+
+
+def write_site_evidence(root, *, source_id=SOURCE_ID, segment_source_id=None):
+    source_dir = root / ".research" / "sources"
+    segment_dir = root / ".research" / "segments"
+    source_dir.mkdir(parents=True, exist_ok=True)
+    segment_dir.mkdir(parents=True, exist_ok=True)
+    source = {
+        "id": source_id,
+        "schema_version": 1,
+        "source_status": "current",
+        "source_type": "webpage",
+        "media_type": "html",
+        "title": "PRIVATE SOURCE TITLE DO NOT EXPORT",
+        "content_sha256": "a" * 64,
+        "retrieved_at": "2026-10-02T12:00:00Z",
+        "raw_location": "PRIVATE RAW LOCATION DO NOT EXPORT",
+        "sensitivity": "restricted",
+        "remote_processing_allowed": False,
+    }
+    segment = {
+        "id": SEGMENT_ID,
+        "schema_version": 1,
+        "source_id": segment_source_id or source_id,
+        "text": "PRIVATE VERBATIM PASSAGE DO NOT EXPORT",
+        "locator": {"scheme": "page", "value": "4"},
+    }
+    (source_dir / f"{source_id}.json").write_text(canonical(source), encoding="utf-8")
+    (segment_dir / f"{SEGMENT_ID}.json").write_text(canonical(segment), encoding="utf-8")
+    return source_dir / f"{source_id}.json", segment_dir / f"{SEGMENT_ID}.json"
+
+
+def add_site_fact(project_dir, *, source_id=SOURCE_ID, segment_id=SEGMENT_ID, status="source_reported"):
+    project_file = project_dir / "project.json"
+    project = read_json(project_file.read_text(encoding="utf-8"))
+    project["site_facts"] = [
+        {
+            "fact_id": "meter-main-fuse",
+            "subject": "utility connection",
+            "property": "main fuse rating",
+            "value": 25,
+            "unit": "A",
+            "status": status,
+            "evidence": [{"source_id": source_id, "segment_id": segment_id}],
+        }
+    ]
+    project_file.write_text(canonical(project), encoding="utf-8")
+    return project
+
+
+def test_site_facts_resolve_local_evidence_and_pin_run_without_exporting_source_text(tmp_path):
+    project_dir = init_project(tmp_path, "site-case", 1)
+    source_file, segment_file = write_site_evidence(tmp_path)
+    source_bytes, segment_bytes = source_file.read_bytes(), segment_file.read_bytes()
+    add_site_fact(project_dir)
+
+    from polder_research.energy import preflight_project
+
+    preflight = preflight_project(tmp_path, "site-case")
+    assert preflight["inputs"]["evidence_snapshot"]["sources"][0]["source_id"] == SOURCE_ID
+    assert not (project_dir / "runs").exists()
+    first = build_project(tmp_path, "site-case")
+    manifest = read_json((first / "manifest.json").read_text())
+    snapshot = manifest["inputs"]["evidence_snapshot"]
+    assert snapshot["sources"][0]["source_id"] == SOURCE_ID
+    assert snapshot["sources"][0]["acquisition_status"] == "acquired"
+    assert snapshot["segments"][0]["segment_id"] == SEGMENT_ID
+    assert main(["--root", str(tmp_path), "preflight", "site-case"]) == 0
+    report = (first / "report.md").read_text()
+    assert "## Assumptions and unresolved work" in report
+    assert "### Typed site facts" in report
+    assert "main fuse rating" in report and "PRIVATE SOURCE TITLE" not in report
+    assert "PRIVATE RAW LOCATION" not in report and "PRIVATE VERBATIM PASSAGE" not in report
+    assert source_file.read_bytes() == source_bytes
+    assert segment_file.read_bytes() == segment_bytes
+
+    source = read_json(source_file.read_text())
+    source["publisher"] = "updated private metadata"
+    source_file.write_text(canonical(source), encoding="utf-8")
+    second = build_project(tmp_path, "site-case")
+    assert first != second
+    second_snapshot = read_json((second / "manifest.json").read_text())["inputs"][
+        "evidence_snapshot"
+    ]
+    assert second_snapshot["sources"][0]["sha256"] != snapshot["sources"][0]["sha256"]
+
+
+@pytest.mark.parametrize(
+    ("status", "evidence", "valid"),
+    [
+        ("assumption", [], True),
+        ("unknown", [], True),
+        ("observed", [], False),
+        ("verified", [], False),
+        ("source_reported", [{"source_id": "not-a-source-id"}], False),
+    ],
+)
+def test_site_fact_schema_status_and_link_contract(tmp_path, status, evidence, valid):
+    from polder_research.schemas import package_registry
+
+    project_id = "case-source" if status == "source_reported" else f"case-{status}"
+    project = read_json((init_project(tmp_path, project_id) / "project.json").read_text())
+    project["site_facts"] = [
+        {
+            "fact_id": "test-fact",
+            "subject": "site",
+            "property": "boundary",
+            "value": None,
+            "status": status,
+            "evidence": evidence,
+        }
+    ]
+    if valid:
+        validate_project(project)
+        package_registry().validate("energy-project", project)
+    else:
+        with pytest.raises(ValueError):
+            validate_project(project)
+
+
+@pytest.mark.parametrize(
+    "failure",
+    ["missing", "missing-segment", "mismatch", "unacquired", "bad-schema", "duplicate-key"],
+)
+def test_site_fact_invalid_local_evidence_is_rejected_without_registering(tmp_path, failure):
+    project_dir = init_project(tmp_path, "site-case", 1)
+    source_file, segment_file = write_site_evidence(
+        tmp_path,
+        segment_source_id=OTHER_SOURCE_ID if failure == "mismatch" else None,
+    )
+    add_site_fact(project_dir)
+    if failure == "unacquired":
+        source = read_json(source_file.read_text())
+        source["acquisition_status"] = "unacquired"
+        source["canonical_url"] = "https://example.invalid/source"
+        source.pop("content_sha256")
+        source.pop("retrieved_at")
+        source["discovered_at"] = "2026-10-02T12:00:00Z"
+        source_file.write_text(canonical(source), encoding="utf-8")
+    elif failure == "bad-schema":
+        source = read_json(source_file.read_text())
+        source["unexpected"] = True
+        source_file.write_text(canonical(source), encoding="utf-8")
+    elif failure == "duplicate-key":
+        source_file.write_text('{"id":"x","id":"y"}', encoding="utf-8")
+    if failure == "missing":
+        source_file.unlink()
+    elif failure == "missing-segment":
+        segment_file.unlink()
+    expected = (
+        "does not belong"
+        if failure == "mismatch"
+        else "not acquired"
+        if failure == "unacquired"
+        else "evidence record"
+    )
+    with pytest.raises(ValueError, match=expected):
+        build_project(tmp_path, "site-case")
+    assert {path.name for path in (tmp_path / ".research" / "sources").iterdir()} == (
+        set() if failure == "missing" else {source_file.name}
+    )
+
+
+def test_site_fact_duplicate_ids_and_symlink_evidence_are_rejected(tmp_path):
+    project_dir = init_project(tmp_path, "site-case", 1)
+    write_site_evidence(tmp_path)
+    project = add_site_fact(project_dir)
+    project["site_facts"].append(dict(project["site_facts"][0]))
+    with pytest.raises(ValueError, match="unique"):
+        validate_project(project)
+    add_site_fact(project_dir)
+    source_file = tmp_path / ".research" / "sources" / f"{SOURCE_ID}.json"
+    external = tmp_path / "external-source.json"
+    external.write_bytes(source_file.read_bytes())
+    source_file.unlink()
+    source_file.symlink_to(external)
+    with pytest.raises(ValueError, match="symlink"):
+        build_project(tmp_path, "site-case")
+
+
+def test_reused_segment_must_match_each_linked_source(tmp_path):
+    project_dir = init_project(tmp_path, "site-case", 1)
+    source_file, _ = write_site_evidence(tmp_path)
+    second_source = read_json(source_file.read_text()) | {"id": OTHER_SOURCE_ID}
+    (source_file.parent / f"{OTHER_SOURCE_ID}.json").write_text(
+        canonical(second_source), encoding="utf-8"
+    )
+    project = add_site_fact(project_dir)
+    project["site_facts"].append(
+        {
+            "fact_id": "second-fact",
+            "subject": "site",
+            "property": "meter location",
+            "value": "main panel",
+            "status": "source_reported",
+            "evidence": [{"source_id": OTHER_SOURCE_ID, "segment_id": SEGMENT_ID}],
+        }
+    )
+    (project_dir / "project.json").write_text(canonical(project), encoding="utf-8")
+    with pytest.raises(ValueError, match="does not belong"):
+        build_project(tmp_path, "site-case")
+
+
+def test_invalid_private_evidence_diagnostics_do_not_echo_record_contents(tmp_path, capsys):
+    project_dir = init_project(tmp_path, "site-case", 1)
+    source_file, segment_file = write_site_evidence(tmp_path)
+    add_site_fact(project_dir)
+    source = read_json(source_file.read_text())
+    source["classification_dimensions"] = {
+        "PRIVATE CUSTOMER ADDRESS AND METER IDENTIFIER": []
+    }
+    source_file.write_text(canonical(source), encoding="utf-8")
+    segment = read_json(segment_file.read_text())
+    segment["text"] = ["PRIVATE CUSTOMER ADDRESS AND METER IDENTIFIER"]
+    segment_file.write_text(canonical(segment), encoding="utf-8")
+
+    assert main(["--root", str(tmp_path), "build", "site-case"]) == 2
+    captured = capsys.readouterr()
+    assert "PRIVATE CUSTOMER ADDRESS AND METER IDENTIFIER" not in captured.err
+    assert "invalid source evidence record" in captured.err
+    assert "schema validation at classification_dimensions" in captured.err
+
+
+@pytest.mark.parametrize("path_kind", ["research", "sources", "segments"])
+def test_site_fact_symlink_directories_are_rejected(tmp_path, path_kind):
+    project_dir = init_project(tmp_path, "site-case", 1)
+    write_site_evidence(tmp_path)
+    add_site_fact(project_dir)
+    research = tmp_path / ".research"
+    if path_kind == "research":
+        moved = tmp_path / "moved-research"
+        research.rename(moved)
+        research.symlink_to(moved, target_is_directory=True)
+    else:
+        directory = research / path_kind
+        moved = tmp_path / f"moved-{path_kind}"
+        directory.rename(moved)
+        directory.symlink_to(moved, target_is_directory=True)
+    with pytest.raises(ValueError, match="symlink"):
+        build_project(tmp_path, "site-case")
+
+
 @pytest.mark.parametrize(
     "project_id", ["../other", "/tmp/test", "Case A", "x/y", "x\\y", "<script>", ""]
 )

@@ -35,8 +35,14 @@ numbers. Do not imply that a concept is an approved electrical installation.
 ## Work loop
 
 1. Confirm site/meter boundary, requested deliverable and data permissions.
-2. Separate observed/source-reported/inferred/assumed/verified/unknown facts.
+2. Separate observed/source-reported/inferred/assumed/unknown facts. Do not label
+   a fact verified: typed site-fact statuses deliberately stop short of approval.
 3. Register primary evidence in the existing research source/claim system.
+   In project records, use optional `site_facts` with stable `fact_id`, `subject`,
+   `property`, scalar `value`, optional `unit`, a permitted status, and local
+   `source_id` plus optional `segment_id` evidence links. Legacy `evidence_refs`
+   are unvalidated pointers. The calculator only reads local canonical source and
+   segment records and pins their hashes; it does not register evidence.
 4. Identify conflicts and measurement gaps; create concrete investigation tasks.
 5. Build explicit scenarios; run `polder-energy --root /private/workspace preflight PROJECT_ID`
    to check the exact CSV contract without writes. Review source boundaries separately,
@@ -73,5 +79,9 @@ passing unit test suite as a claim of code compliance or safe installation.
 ## Current implementation limit
 
 `polder-energy` always emits `concept_only`; it has no approval or live-control
-command. Evidence strings are not yet validated links. Do not claim the schema,
-workflow or dashboard integration milestones are complete.
+command. Legacy `evidence_refs` remain unresolved string pointers. Optional typed
+`site_facts` resolve and read local canonical source/segment records, validate
+structure and relationships, and pin their hashes; this does not verify fact truth
+or grant engineering approval. Broader claim/equipment adjudication, approval
+workflows and dashboard integration remain planned. Do not claim those milestones
+are complete.

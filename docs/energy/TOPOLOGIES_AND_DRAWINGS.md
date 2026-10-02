@@ -106,12 +106,25 @@ Energy diagrams alone cannot validate PE/N connections or electrical code compli
 The current run bundle contains `concept-sheet.drawio` (editable customer-facing
 concept), `concept-sheet.svg` (preview) and `electrical-schematic.qet` (editable
 generic functional blocks), generated from the same scenario and run revision.
-The QET prototype includes editable component labels and stable IDs, the full
-source run ID and supply/storage model facts. Its XML input-slot pairing and
-metadata are regression-tested; actual opening/rendering in the target QET editor
-remains unverified. Its schematic projects the shared power-edge subset; the local
+The QET prototype includes component labels and generated stable component IDs
+as editable text fields, plus the full source run ID and supply/storage model
+facts as editable diagram annotations. These values are not immutable identifiers
+or protected provenance: a manual edit can change them. XML input-slot pairing
+and annotation content are regression-tested; actual target-editor rendering and
+open/save/reopen remain unverified. Its schematic projects the shared power-edge subset; the local
 controller and dashed data/control links shown in the concept sheet are omitted.
 These checks do not constitute engineering approval.
+
+The documented basis is QET XML 0.3's [editable definition fields](https://qelectrotech.org/wiki_new/doc/xml_struct_elements_0.3#les_champs_de_texte)
+and [coordinate-matched instance fields and independent diagram inputs](https://qelectrotech.org/wiki_new/doc/xml_projects_0.3#champs_de_texte).
+Using those fields for our IDs and run annotations is an implementation choice,
+not an upstream guarantee of identity preservation. QET also documents [project
+variables for title blocks](https://download.qelectrotech.org/qet/manuals/html/users/project/properties/general_prop.html)
+and [element information for BOM export](https://download.qelectrotech.org/qet/manuals/html/users/element/properties/element_information.html);
+those capabilities do not establish that this prototype supplies native metadata
+or a procurement-ready BOM. See sources S11–S12 in [RESEARCH_SOURCES.md](RESEARCH_SOURCES.md).
+
+Preserve the hashed generated run bundle; make a derivative copy for editing.
 Open the native files in draw.io Desktop or QElectroTech; no hosted editor
 integration is used, so customer data does not need to be sent to an embedded web
 editor. Manual drawing edits do not flow back into the numerical model. The QET
